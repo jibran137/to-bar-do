@@ -67,7 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func showMainWindow() {
         if mainWindow == nil {
             let hosting = NSHostingController(rootView: MainView().environmentObject(store))
-            let window = NSWindow(contentViewController: hosting)
+            let window = EscClosableWindow(contentViewController: hosting)
             window.title = "To-Bar-Do"
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             window.setContentSize(NSSize(width: 380, height: 480))
@@ -96,5 +96,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         default: // open / menu / tasks / nil → show the menu bar dropdown
             showPopover()
         }
+    }
+}
+
+/// Main window that closes on the Esc key. AppKit routes Esc to
+/// `cancelOperation(_:)` up the responder chain; the window is the last link,
+/// so overriding it here gives us Esc-to-close without touching the SwiftUI view.
+private final class EscClosableWindow: NSWindow {
+    override func cancelOperation(_ sender: Any?) {
+        close()
     }
 }
