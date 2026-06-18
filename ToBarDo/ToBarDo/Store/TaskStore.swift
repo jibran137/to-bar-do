@@ -42,6 +42,14 @@ final class TaskStore: ObservableObject {
         save()
     }
 
+    /// Replaces a task's title. Used by the menu bar's keyboard editing
+    /// (type-to-append, Backspace-to-trim on the highlighted task).
+    func updateTitle(_ task: TodoTask, to newTitle: String) {
+        guard let index = tasks.firstIndex(where: { $0.id == task.id }) else { return }
+        tasks[index].title = newTitle
+        save()
+    }
+
     // MARK: - Persistence
 
     private func load() {

@@ -5,6 +5,8 @@ import SwiftUI
 struct TaskRow: View {
     @EnvironmentObject private var store: TaskStore
     let task: TodoTask
+    /// Highlighted by keyboard navigation (menu bar popover only).
+    var isSelected: Bool = false
     @State private var hovering = false
 
     var body: some View {
@@ -37,6 +39,7 @@ struct TaskRow: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
+        .background(isSelected ? Color.accentColor.opacity(0.18) : Color.clear)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
     }
