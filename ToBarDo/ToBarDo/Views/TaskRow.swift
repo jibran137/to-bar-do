@@ -64,7 +64,9 @@ struct TaskRow: View {
         .padding(.vertical, 6)
         .background(isSelected ? Color.accentColor.opacity(0.18) : Color.clear)
         .contentShape(Rectangle())
-        .onTapGesture { onSelect() }
+        // Fires alongside the row's buttons without the recognition lag of a
+        // plain .onTapGesture, so selection lands as soon as you click.
+        .simultaneousGesture(TapGesture().onEnded { onSelect() })
         .contextMenu {
             Button("Edit title…") { startEdit(.title) }
             if task.url == nil {
