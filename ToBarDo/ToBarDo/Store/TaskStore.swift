@@ -50,6 +50,14 @@ final class TaskStore: ObservableObject {
         save()
     }
 
+    /// Sets (or clears, when blank/nil) a task's optional link.
+    func updateURL(_ task: TodoTask, to newURL: String?) {
+        guard let index = tasks.firstIndex(where: { $0.id == task.id }) else { return }
+        let trimmed = newURL?.trimmingCharacters(in: .whitespacesAndNewlines)
+        tasks[index].url = (trimmed?.isEmpty ?? true) ? nil : trimmed
+        save()
+    }
+
     // MARK: - Persistence
 
     private func load() {

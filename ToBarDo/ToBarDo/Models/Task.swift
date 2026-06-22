@@ -9,11 +9,15 @@ struct TodoTask: Identifiable, Codable, Equatable {
     var title: String
     var isDone: Bool
     let createdAt: Date
+    /// Optional link for the task (e.g. a Jira ticket URL). Decodes to `nil`
+    /// for tasks saved before this field existed.
+    var url: String?
 
-    init(id: UUID = UUID(), title: String, isDone: Bool = false, createdAt: Date = Date()) {
+    init(id: UUID = UUID(), title: String, isDone: Bool = false, createdAt: Date = Date(), url: String? = nil) {
         self.id = id
         self.title = title
         self.isDone = isDone
         self.createdAt = createdAt
+        self.url = url
     }
 }

@@ -16,6 +16,8 @@ struct MenuBarView: View {
     @State private var newTitle = ""
     /// The keyboard-highlighted task, tracked by id so it survives reordering.
     @State private var selectedID: TodoTask.ID?
+    /// Routes popover key events to `handleKey` without relying on first responder.
+    @StateObject private var keys = PopoverKeyMonitor()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -45,7 +47,12 @@ struct MenuBarView: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         ForEach(store.tasks) { task in
-                            TaskRow(task: task, isSelected: task.id == selectedID, titleLineLimit: 3)
+                            TaskRow(
+                                task: task,
+                                isSelected: task.id == selectedID,
+                                titleLineLimit: 3,
+                                onSelect: { selectedID = task.id }
+                            )
                             Divider()
                         }
                     }
@@ -70,10 +77,12 @@ struct MenuBarView: View {
             .padding(10)
         }
         .frame(width: 300)
-        // Invisible key catcher; grabs first responder whenever the popover opens.
-        .background(KeyCaptureView(onKeyDown: handleKey).frame(width: 0, height: 0))
+        // Resolve the popover window so the key monitor only reacts to it.
+        .background(WindowReader { keys.window = $0 }.frame(width: 0, height: 0))
         .onAppear {
             if selectedID == nil { selectedID = store.tasks.first?.id }
+            keys.handler = handleKey
+            keys.start()
         }
     }
 
@@ -93,8 +102,11 @@ struct MenuBarView: View {
         return store.tasks.first { $0.id == id }
     }
 
-    /// Handles a raw key-down from `KeyCaptureView`. Returns true if consumed.
-    private func handleKey(_ event: NSEvent) -> Bool {
+    /// Handles a popover key-down. `editing` is true when a text field (the
+    /// quick-add field or an inline editor) has focus — in that case only the
+    /// arrow keys are taken for navigation; everything else stays in the field.
+    /// Returns true if the key was consumed.
+    private func handleKey(_ event: NSEvent, editing: Bool) -> Bool {
         guard !store.tasks.isEmpty else { return false }
         if selectedTask == nil { selectedID = store.tasks.first?.id }
 
@@ -103,23 +115,28 @@ struct MenuBarView: View {
         if mods.contains(.command) || mods.contains(.control) { return false }
 
         switch event.keyCode {
-        case 126:                       // ↑
+        case 126:                       // ↑ — always navigates
             move(-1); return true
-        case 125:                       // ↓
+        case 125:                       // ↓ — always navigates
             move(1); return true
         case 36, 76:                    // Return / keypad Enter
+            // While typing a new task, let the quick-add field submit instead.
+            if editing && !isEmpty { return false }
             if let task = selectedTask { store.toggle(task) }
             return true
         case 117:                       // forward Delete (fn+Delete) → remove task
+            if editing { return false }
             deleteSelected(); return true
         case 51:                        // Backspace
+            if editing { return false }  // edit the focused field instead
             if mods.contains(.shift) {
-                deleteSelected()        // Shift+Delete → remove task
+                deleteSelected()         // Shift+Delete → remove task
             } else if let task = selectedTask, !task.title.isEmpty {
                 store.updateTitle(task, to: String(task.title.dropLast())) // trim
             }
             return true
         default:
+            if editing { return false }  // typing goes to the focused field
             // Type-to-append: printable characters (incl. space) extend the title.
             guard let chars = event.characters, !chars.isEmpty,
                   chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value != 0x7F }) else {
