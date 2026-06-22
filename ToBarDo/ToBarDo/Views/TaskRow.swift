@@ -7,6 +7,9 @@ struct TaskRow: View {
     let task: TodoTask
     /// Highlighted by keyboard navigation (menu bar popover only).
     var isSelected: Bool = false
+    /// Max lines for the title; `nil` wraps fully (used by the main window).
+    /// The compact popover caps this and relies on the hover tooltip for the rest.
+    var titleLineLimit: Int? = nil
     @State private var hovering = false
 
     var body: some View {
@@ -22,7 +25,8 @@ struct TaskRow: View {
             Text(task.title)
                 .strikethrough(task.isDone)
                 .foregroundStyle(task.isDone ? .secondary : .primary)
-                .lineLimit(2)
+                .lineLimit(titleLineLimit)
+                .help(task.title)
 
             Spacer(minLength: 4)
 

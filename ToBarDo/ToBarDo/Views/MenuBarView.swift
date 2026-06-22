@@ -45,7 +45,7 @@ struct MenuBarView: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         ForEach(store.tasks) { task in
-                            TaskRow(task: task, isSelected: task.id == selectedID)
+                            TaskRow(task: task, isSelected: task.id == selectedID, titleLineLimit: 3)
                             Divider()
                         }
                     }
