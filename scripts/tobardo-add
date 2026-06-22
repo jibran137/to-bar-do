@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#
+# tobardo-add — add a task to To-Bar-Do from the command line.
+#
+# Usage:
+#   tobardo-add Buy milk
+#   tobardo-add "Call the dentist tomorrow"
+#   echo "Reply to Sam" | tobardo-add        # reads from stdin if no args
+#
+# Works whether or not the app is already running: macOS routes the
+# tobardo:// URL to the app (cold-launching it if needed), which appends the
+# task and persists it. No window is shown.
+
+set -euo pipefail
+
+# Collect the task text from arguments, or stdin if none were given.
+if [ "$#" -gt 0 ]; then
+    title="$*"
+else
+    title="$(cat)"
+fi
+
+# Trim whitespace; bail if empty.
+title="$(printf '%s' "$title" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+if [ -z "$title" ]; then
+    echo "usage: tobardo-add <task text>" >&2
+    exit 1
+fi
+
+# Percent-encode the title so spaces/punctuation survive the URL.
+encoded="$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$title")"
+
+open "tobardo://add?title=${encoded}"

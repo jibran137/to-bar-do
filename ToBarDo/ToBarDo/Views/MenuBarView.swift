@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The compact view shown when you click the menu bar icon.
@@ -6,7 +7,8 @@ import SwiftUI
 /// ↑/↓ move a highlight through the list, Return toggles the highlighted task
 /// done, typing (incl. space) appends to its title, Backspace trims the last
 /// character, and Shift+Delete (or the forward-Delete key, fn+Delete) removes
-/// the task.
+/// the task. Keys are captured by `KeyCaptureView` because SwiftUI's
+/// `.onKeyPress` focus is unreliable inside an `NSPopover`.
 struct MenuBarView: View {
     @EnvironmentObject private var store: TaskStore
     /// Called when the user taps "Open To-Bar-Do"; injected by the AppDelegate.
@@ -14,7 +16,6 @@ struct MenuBarView: View {
     @State private var newTitle = ""
     /// The keyboard-highlighted task, tracked by id so it survives reordering.
     @State private var selectedID: TodoTask.ID?
-    @FocusState private var listFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -69,15 +70,10 @@ struct MenuBarView: View {
             .padding(10)
         }
         .frame(width: 300)
-        .focusable()
-        .focusEffectDisabled()
-        .focused($listFocused)
-        .onKeyPress(action: handleKey)
+        // Invisible key catcher; grabs first responder whenever the popover opens.
+        .background(KeyCaptureView(onKeyDown: handleKey).frame(width: 0, height: 0))
         .onAppear {
             if selectedID == nil { selectedID = store.tasks.first?.id }
-            // Defer so the list (not the add field) holds focus when the
-            // popover opens, making ↑/↓ work immediately.
-            DispatchQueue.main.async { listFocused = true }
         }
     }
 
@@ -97,42 +93,40 @@ struct MenuBarView: View {
         return store.tasks.first { $0.id == id }
     }
 
-    private func handleKey(_ press: KeyPress) -> KeyPress.Result {
-        guard !store.tasks.isEmpty else { return .ignored }
+    /// Handles a raw key-down from `KeyCaptureView`. Returns true if consumed.
+    private func handleKey(_ event: NSEvent) -> Bool {
+        guard !store.tasks.isEmpty else { return false }
         if selectedTask == nil { selectedID = store.tasks.first?.id }
 
-        switch press.key {
-        case .upArrow:
-            move(-1); return .handled
-        case .downArrow:
-            move(1); return .handled
-        case .return:
+        // Let ⌘/⌃ shortcuts (Quit, etc.) pass through untouched.
+        let mods = event.modifierFlags
+        if mods.contains(.command) || mods.contains(.control) { return false }
+
+        switch event.keyCode {
+        case 126:                       // ↑
+            move(-1); return true
+        case 125:                       // ↓
+            move(1); return true
+        case 36, 76:                    // Return / keypad Enter
             if let task = selectedTask { store.toggle(task) }
-            return .handled
-        case .deleteForward:           // fn+Delete → remove the whole task
-            deleteSelected(); return .handled
-        case .delete:
-            if press.modifiers.contains(.shift) {
-                deleteSelected()       // Shift+Delete → remove the whole task
+            return true
+        case 117:                       // forward Delete (fn+Delete) → remove task
+            deleteSelected(); return true
+        case 51:                        // Backspace
+            if mods.contains(.shift) {
+                deleteSelected()        // Shift+Delete → remove task
             } else if let task = selectedTask, !task.title.isEmpty {
-                store.updateTitle(task, to: String(task.title.dropLast())) // Backspace → trim
+                store.updateTitle(task, to: String(task.title.dropLast())) // trim
             }
-            return .handled
+            return true
         default:
-            // Type-to-append: printable characters (incl. space) extend the
-            // highlighted task. Ignore anything carrying ⌘/⌃ so shortcuts work.
-            guard press.modifiers.isDisjoint(with: [.command, .control]) else {
-                return .ignored
-            }
-            let chars = press.characters
-            guard !chars.isEmpty,
+            // Type-to-append: printable characters (incl. space) extend the title.
+            guard let chars = event.characters, !chars.isEmpty,
                   chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value != 0x7F }) else {
-                return .ignored
+                return false
             }
-            if let task = selectedTask {
-                store.updateTitle(task, to: task.title + chars)
-            }
-            return .handled
+            if let task = selectedTask { store.updateTitle(task, to: task.title + chars) }
+            return true
         }
     }
 

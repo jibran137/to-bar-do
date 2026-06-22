@@ -93,9 +93,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch url.host?.lowercased() {
         case "window":
             showMainWindow()
+        case "add":
+            addTask(from: url)
         default: // open / menu / tasks / nil → show the menu bar dropdown
             showPopover()
         }
+    }
+
+    /// `tobardo://add?title=…` (or `text=`) — append a task without showing any
+    /// UI, so it works cleanly from a shell: `open "tobardo://add?title=Buy%20milk"`.
+    private func addTask(from url: URL) {
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        let title = components?.queryItems?
+            .first { $0.name == "title" || $0.name == "text" }?.value ?? ""
+        store.add(title: title) // store.add trims and ignores empty input
     }
 }
 
