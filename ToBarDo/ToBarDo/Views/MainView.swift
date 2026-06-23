@@ -4,8 +4,18 @@ import SwiftUI
 struct MainView: View {
     @EnvironmentObject private var store: TaskStore
     @State private var newTitle = ""
+    @State private var showingArchive = false
+    @State private var showingOptions = false
 
     var body: some View {
+        if showingArchive {
+            ArchiveView(onBack: { showingArchive = false })
+        } else {
+            activeList
+        }
+    }
+
+    private var activeList: some View {
         VStack(spacing: 0) {
             // Add row
             HStack(spacing: 8) {
@@ -40,9 +50,40 @@ struct MainView: View {
                         TaskRow(task: task)
                             .listRowInsets(EdgeInsets())
                     }
+                    .onMove { store.move(fromOffsets: $0, toOffset: $1) }
                 }
                 .listStyle(.inset)
             }
+
+            Divider()
+
+            // Footer: jump to the archive (full history) + running done tally.
+            HStack {
+                Button {
+                    showingArchive = true
+                } label: {
+                    Label("Archive", systemImage: "archivebox")
+                }
+                .buttonStyle(.plain)
+                Spacer()
+                if store.completedCount > 0 {
+                    Text("\(store.completedCount) completed")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Button {
+                    showingOptions = true
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .buttonStyle(.plain)
+                .help("Options")
+                .popover(isPresented: $showingOptions, arrowEdge: .bottom) {
+                    OptionsView().environmentObject(store)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
         }
         .frame(minWidth: 360, minHeight: 420)
     }

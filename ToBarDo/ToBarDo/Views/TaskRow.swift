@@ -15,6 +15,12 @@ struct TaskRow: View {
     /// Called when the row is clicked, so the popover can move its keyboard
     /// highlight to the clicked task. No-op in the main window.
     var onSelect: () -> Void = {}
+    /// Overrides the destructive "Delete" action. Defaults to a soft delete
+    /// (removes from the active list, keeps the archive copy). The archive view
+    /// passes a permanent-delete handler that confirms first.
+    var onDelete: ((TodoTask) -> Void)? = nil
+    /// Shows a "Completed …" caption under the title (used by the archive).
+    var showsCompletion: Bool = false
 
     @State private var editingField: EditField?
     @State private var draft = ""
@@ -40,11 +46,18 @@ struct TaskRow: View {
                     .onSubmit(commitEdit)
                     .onExitCommand(perform: cancelEdit)
             } else {
-                Text(task.title)
-                    .strikethrough(task.isDone)
-                    .foregroundStyle(task.isDone ? .secondary : .primary)
-                    .lineLimit(titleLineLimit)
-                    .help(task.title)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(task.title)
+                        .strikethrough(task.isDone)
+                        .foregroundStyle(task.isDone ? .secondary : .primary)
+                        .lineLimit(titleLineLimit)
+                        .help(task.title)
+                    if showsCompletion, let when = completedCaption {
+                        Text(when)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
             }
 
             Spacer(minLength: 4)
@@ -64,6 +77,10 @@ struct TaskRow: View {
         .padding(.vertical, 6)
         .background(isSelected ? Color.accentColor.opacity(0.18) : Color.clear)
         .contentShape(Rectangle())
+        // Double-click anywhere on the row to edit its title inline.
+        .onTapGesture(count: 2) {
+            if editingField == nil { startEdit(.title) }
+        }
         // Fires alongside the row's buttons without the recognition lag of a
         // plain .onTapGesture, so selection lands as soon as you click.
         .simultaneousGesture(TapGesture().onEnded { onSelect() })
@@ -76,8 +93,17 @@ struct TaskRow: View {
                 Button("Remove link") { store.updateURL(task, to: nil) }
             }
             Divider()
-            Button("Delete", role: .destructive) { store.delete(task) }
+            Button("Delete", role: .destructive) { (onDelete ?? { store.delete($0) })(task) }
         }
+    }
+
+    /// "Completed 3 days ago" for a done task, or "Not completed" otherwise.
+    private var completedCaption: String? {
+        guard task.isDone else { return "Not completed" }
+        guard let date = task.completedAt else { return "Completed" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return "Completed " + formatter.localizedString(for: date, relativeTo: Date())
     }
 
     /// The task's link as an openable URL, defaulting a missing scheme to https.
