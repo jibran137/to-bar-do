@@ -6,6 +6,9 @@ struct MainView: View {
     @State private var newTitle = ""
     @State private var showingArchive = false
     @State private var showingOptions = false
+    /// When on, each row shows up/down buttons to reorder it. A reliable,
+    /// self-explanatory alternative to drag-to-reorder.
+    @State private var isReordering = false
 
     var body: some View {
         if showingArchive {
@@ -47,8 +50,18 @@ struct MainView: View {
             } else {
                 List {
                     ForEach(store.tasks) { task in
-                        TaskRow(task: task)
-                            .listRowInsets(EdgeInsets())
+                        HStack(spacing: 4) {
+                            if isReordering {
+                                Image(systemName: "line.3.horizontal")
+                                    .foregroundStyle(.tertiary)
+                                    .padding(.leading, 10)
+                            }
+                            // In reorder mode the row is non-interactive so the
+                            // tap/double-click gestures don't swallow List's drag.
+                            TaskRow(task: task)
+                                .allowsHitTesting(!isReordering)
+                        }
+                        .listRowInsets(EdgeInsets())
                     }
                     .onMove { store.move(fromOffsets: $0, toOffset: $1) }
                 }
@@ -81,6 +94,16 @@ struct MainView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                if store.tasks.count > 1 {
+                    Button {
+                        isReordering.toggle()
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(isReordering ? Color.accentColor : Color.secondary)
+                    .help(isReordering ? "Done reordering" : "Reorder tasks")
+                }
                 Button {
                     showingOptions = true
                 } label: {
@@ -96,6 +119,9 @@ struct MainView: View {
             .padding(.vertical, 8)
         }
         .frame(minWidth: 360, minHeight: 420)
+        .onChange(of: store.tasks.count) { _, count in
+            if count < 2 { isReordering = false }   // toggle hides; don't get stuck on
+        }
     }
 
     private var isEmpty: Bool {
