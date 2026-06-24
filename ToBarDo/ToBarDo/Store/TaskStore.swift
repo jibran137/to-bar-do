@@ -65,7 +65,7 @@ final class TaskStore: ObservableObject {
     /// Persisted to `UserDefaults`; changing it re-runs the sweep immediately.
     @Published var autoArchiveDelay: AutoArchiveDelay {
         didSet {
-            UserDefaults.standard.set(autoArchiveDelay.rawValue, forKey: Self.delayKey)
+            defaults.set(autoArchiveDelay.rawValue, forKey: Self.delayKey)
             archiveCompletedIfDue()
         }
     }
@@ -75,13 +75,17 @@ final class TaskStore: ObservableObject {
     /// observer through the `@Published` wrapper and recurses).
     @Published var customDays: Int {
         didSet {
-            UserDefaults.standard.set(customDays, forKey: Self.customDaysKey)
+            defaults.set(customDays, forKey: Self.customDaysKey)
             archiveCompletedIfDue()
         }
     }
 
     private static let delayKey = "autoArchiveDelay"
     private static let customDaysKey = "autoArchiveCustomDays"
+
+    /// Where settings persist. Injectable so tests can use a throwaway suite
+    /// instead of clobbering the user's real defaults.
+    private let defaults: UserDefaults
 
     /// The delay actually in effect: the preset interval, or the custom day
     /// count converted to seconds.
@@ -96,16 +100,21 @@ final class TaskStore: ObservableObject {
     /// archiving, so it happens even while the app sits idle.
     private var sweepTimer: Timer?
 
-    init() {
+    /// - Parameters:
+    ///   - directory: where `tasks.json` / `archive.json` live. Defaults to the
+    ///     app-support folder; tests pass a temp dir so they never touch real data.
+    ///   - defaults: settings store. Defaults to `.standard`; tests pass a suite.
+    init(directory: URL? = nil, defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         let fm = FileManager.default
-        let dir = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let dir = directory ?? fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("To-Bar-Do", isDirectory: true)
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         self.fileURL = dir.appendingPathComponent("tasks.json")
         self.archiveURL = dir.appendingPathComponent("archive.json")
-        let saved = UserDefaults.standard.string(forKey: Self.delayKey)
+        let saved = defaults.string(forKey: Self.delayKey)
         self.autoArchiveDelay = saved.flatMap(AutoArchiveDelay.init) ?? .never
-        self.customDays = min(365, max(1, (UserDefaults.standard.object(forKey: Self.customDaysKey) as? Int) ?? 7))
+        self.customDays = min(365, max(1, (defaults.object(forKey: Self.customDaysKey) as? Int) ?? 7))
         load()
         archiveCompletedIfDue()
         startSweepTimer()

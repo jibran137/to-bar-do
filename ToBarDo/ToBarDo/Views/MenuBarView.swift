@@ -3,12 +3,12 @@ import SwiftUI
 
 /// The compact view shown when you click the menu bar icon.
 ///
-/// Keyboard-driven (the primary path is opening this via a Raycast hotkey):
-/// ↑/↓ move a highlight through the list, Return toggles the highlighted task
-/// done, typing (incl. space) appends to its title, Backspace trims the last
-/// character, and Shift+Delete (or the forward-Delete key, fn+Delete) removes
-/// the task. Keys are captured by `KeyCaptureView` because SwiftUI's
-/// `.onKeyPress` focus is unreliable inside an `NSPopover`.
+/// Keyboard navigation: ↑/↓ move a highlight through the list, Return toggles
+/// the highlighted task done, and Shift+Delete (or the forward-Delete key,
+/// fn+Delete) removes it. Typing always goes to the quick-add field — to rename
+/// a task, double-click it or use the right-click menu. Keys are captured by a
+/// local monitor because SwiftUI's `.onKeyPress` focus is unreliable inside an
+/// `NSPopover`.
 struct MenuBarView: View {
     @EnvironmentObject private var store: TaskStore
     /// Called when the user taps "Open To-Bar-Do"; injected by the AppDelegate.
@@ -104,7 +104,8 @@ struct MenuBarView: View {
 
     /// Handles a popover key-down. `editing` is true when a text field (the
     /// quick-add field or an inline editor) has focus — in that case only the
-    /// arrow keys are taken for navigation; everything else stays in the field.
+    /// arrow keys are taken for navigation; everything else stays in the field
+    /// so typing renames nothing and lands in the field you're in.
     /// Returns true if the key was consumed.
     private func handleKey(_ event: NSEvent, editing: Bool) -> Bool {
         guard !store.tasks.isEmpty else { return false }
@@ -127,23 +128,14 @@ struct MenuBarView: View {
         case 117:                       // forward Delete (fn+Delete) → remove task
             if editing { return false }
             deleteSelected(); return true
-        case 51:                        // Backspace
-            if editing { return false }  // edit the focused field instead
-            if mods.contains(.shift) {
-                deleteSelected()         // Shift+Delete → remove task
-            } else if let task = selectedTask, !task.title.isEmpty {
-                store.updateTitle(task, to: String(task.title.dropLast())) // trim
-            }
-            return true
+        case 51:                        // Shift+Backspace → remove the selected task
+            if editing { return false }  // plain Backspace edits the focused field
+            if mods.contains(.shift) { deleteSelected(); return true }
+            return false
         default:
-            if editing { return false }  // typing goes to the focused field
-            // Type-to-append: printable characters (incl. space) extend the title.
-            guard let chars = event.characters, !chars.isEmpty,
-                  chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value != 0x7F }) else {
-                return false
-            }
-            if let task = selectedTask { store.updateTitle(task, to: task.title + chars) }
-            return true
+            // Everything else (including typing) belongs to the focused field —
+            // to rename a task, double-click it or use the right-click menu.
+            return false
         }
     }
 
