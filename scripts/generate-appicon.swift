@@ -13,6 +13,25 @@ import AppKit
 
 let outDir = CommandLine.arguments[1]
 
+/// Apple-style rounded tile as a *continuous-curvature* squircle (a superellipse),
+/// not a plain circular-arc rounded rect. The continuous corner is what reads as
+/// a native macOS/Apple icon rather than a generic rounded square.
+func squirclePath(in rect: CGRect, exponent n: CGFloat = 5) -> NSBezierPath {
+    let path = NSBezierPath()
+    let cx = rect.midX, cy = rect.midY
+    let a = rect.width / 2, b = rect.height / 2
+    let steps = 720
+    for i in 0...steps {
+        let t = CGFloat(i) / CGFloat(steps) * 2 * .pi
+        let ct = cos(t), st = sin(t)
+        let x = cx + a * copysign(pow(abs(ct), 2 / n), ct)
+        let y = cy + b * copysign(pow(abs(st), 2 / n), st)
+        if i == 0 { path.move(to: CGPoint(x: x, y: y)) } else { path.line(to: CGPoint(x: x, y: y)) }
+    }
+    path.close()
+    return path
+}
+
 /// Renders one square icon at the given pixel size and returns PNG data.
 func renderIcon(pixels: Int) -> Data {
     let size = CGFloat(pixels)
@@ -25,15 +44,19 @@ func renderIcon(pixels: Int) -> Data {
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
 
-    // Rounded-rect tile, macOS-style (content inset from the canvas edge).
-    let margin = size * 0.085
+    // Continuous-corner squircle tile, inset from the canvas edge like a macOS icon.
+    let margin = size * 0.095
     let rect = CGRect(x: margin, y: margin, width: size - 2 * margin, height: size - 2 * margin)
-    let radius = rect.width * 0.2237
-    let tile = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
+    let tile = squirclePath(in: rect)
 
     let top = NSColor(srgbRed: 0.33, green: 0.66, blue: 1.00, alpha: 1)
     let bottom = NSColor(srgbRed: 0.13, green: 0.40, blue: 0.93, alpha: 1)
     NSGradient(starting: top, ending: bottom)!.draw(in: tile, angle: -90)
+
+    // Subtle top-edge sheen for a touch of depth (kept faint to stay minimal).
+    tile.setClip()
+    let sheen = NSGradient(colors: [NSColor(white: 1, alpha: 0.18), NSColor(white: 1, alpha: 0)])!
+    sheen.draw(in: CGRect(x: rect.minX, y: rect.midY, width: rect.width, height: rect.height / 2), angle: -90)
 
     // White "checklist" glyph, centered — same symbol as the menu bar item.
     let cfg = NSImage.SymbolConfiguration(pointSize: size * 0.42, weight: .semibold)

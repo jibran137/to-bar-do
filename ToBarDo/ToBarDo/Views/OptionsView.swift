@@ -1,9 +1,14 @@
 import SwiftUI
+import ServiceManagement
 
 /// The little settings popover reached from the gear button in the main window.
-/// Currently just the auto-archive delay; room to grow if more options arrive.
+/// Auto-archive delay, launch-at-login, and the global shortcut reference.
 struct OptionsView: View {
     @EnvironmentObject private var store: TaskStore
+
+    /// Mirrors `SMAppService.mainApp` registration. Seeded from the live status
+    /// so the toggle reflects reality each time the popover opens.
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -29,6 +34,27 @@ struct OptionsView: View {
             }
 
             Text("Completed tasks leave your list after this long. They're always kept in the archive until you delete them there.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+
+            Toggle("Launch at login", isOn: $launchAtLogin)
+                .onChange(of: launchAtLogin) { _, wantsEnabled in
+                    do {
+                        if wantsEnabled {
+                            try SMAppService.mainApp.register()
+                        } else {
+                            try SMAppService.mainApp.unregister()
+                        }
+                    } catch {
+                        // Roll the toggle back to the real state if the system
+                        // refused (e.g. running from a quarantined location).
+                        launchAtLogin = SMAppService.mainApp.status == .enabled
+                    }
+                }
+            Text("Start To-Bar-Do automatically when you log in, so ⌥⌘T works without launching it first.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

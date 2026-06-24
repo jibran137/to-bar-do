@@ -15,6 +15,10 @@ struct TaskRow: View {
     /// Called when the row is clicked, so the popover can move its keyboard
     /// highlight to the clicked task. No-op in the main window.
     var onSelect: () -> Void = {}
+    /// Whether a single tap selects this row. Only the popover wants this; the
+    /// main window leaves it off so the tap gesture doesn't swallow List's
+    /// drag-to-reorder.
+    var isSelectable: Bool = false
     /// Overrides the destructive "Delete" action. Defaults to a soft delete
     /// (removes from the active list, keeps the archive copy). The archive view
     /// passes a permanent-delete handler that confirms first.
@@ -82,8 +86,9 @@ struct TaskRow: View {
             if editingField == nil { startEdit(.title) }
         }
         // Fires alongside the row's buttons without the recognition lag of a
-        // plain .onTapGesture, so selection lands as soon as you click.
-        .simultaneousGesture(TapGesture().onEnded { onSelect() })
+        // plain .onTapGesture, so selection lands as soon as you click. Popover
+        // only — in the main window it would intercept List's reorder drag.
+        .simultaneousGesture(TapGesture().onEnded { onSelect() }, including: isSelectable ? .all : .subviews)
         .contextMenu {
             Button("Edit title…") { startEdit(.title) }
             if task.url == nil {

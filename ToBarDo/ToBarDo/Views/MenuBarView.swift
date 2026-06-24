@@ -51,7 +51,8 @@ struct MenuBarView: View {
                                 task: task,
                                 isSelected: task.id == selectedID,
                                 titleLineLimit: 3,
-                                onSelect: { selectedID = task.id }
+                                onSelect: { selectedID = task.id },
+                                isSelectable: true
                             )
                             Divider()
                         }
@@ -66,6 +67,10 @@ struct MenuBarView: View {
             HStack {
                 Button("Open To-Bar-Do") {
                     openMainWindow()
+                }
+                if store.lastDeleted != nil {
+                    Button("Undo") { store.undoLastDelete() }
+                        .help("Restore the last deleted task")
                 }
                 Spacer()
                 Button("Quit") {

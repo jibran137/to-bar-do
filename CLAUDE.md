@@ -50,15 +50,22 @@ ToBarDo/ToBarDo/
 ├── HotKeyManager.swift       # Carbon RegisterEventHotKey wrapper (global ⌥⌘T)
 ├── Info.plist                # LSUIElement + CFBundleURLTypes (tobardo)
 ├── Models/Task.swift         # TodoTask (Codable, Identifiable; isDone, completedAt, url)
-├── Store/TaskStore.swift     # tasks + archive JSON; add/toggle/delete/purge/move/auto-archive
+├── Store/TaskStore.swift     # tasks + archive JSON; add/toggle/delete/undo/purge/move/auto-archive
 └── Views/
     ├── MenuBarView.swift     # dropdown UI (takes an openMainWindow closure)
-    ├── MainView.swift        # full window UI (reorder, Archive + Options buttons)
+    ├── MainView.swift        # full window UI (reorder, Undo, Archive + Options)
     ├── ArchiveView.swift     # archive/history view; permanent delete + clear
-    ├── OptionsView.swift     # options popover: auto-archive delay, hotkey display
+    ├── OptionsView.swift     # options popover: auto-archive, launch-at-login, hotkey
     ├── PopoverKeyMonitor.swift # popover keyboard event monitor
     └── TaskRow.swift         # shared row: toggle, double-click-to-edit, context menu
+
+ToBarDo/ToBarDoTests/
+└── TaskStoreTests.swift      # unit tests for TaskStore (temp dir + throwaway defaults)
 ```
+
+`TaskStore.init(directory:defaults:)` takes optional injection points so tests
+run against a temp dir and a throwaway `UserDefaults` suite — the app uses the
+real app-support folder / `.standard` via the defaults.
 
 ## Build / run
 
@@ -66,6 +73,14 @@ See `BUILD.md`. TL;DR: needs full Xcode 16+ on macOS 15+; `open
 ToBarDo/ToBarDo.xcodeproj` then ⌘R, or `xcodebuild ... build`. From a shell
 where `xcode-select` points at Command Line Tools, prefix builds with
 `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
+
+Tests (the `ToBarDoTests` target, hosted by the app):
+
+```
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+  xcodebuild test -project ToBarDo/ToBarDo.xcodeproj -scheme ToBarDo \
+  -destination 'platform=macOS'
+```
 
 ## Status (done)
 
@@ -83,10 +98,19 @@ where `xcode-select` points at Command Line Tools, prefix builds with
   (`autoArchiveDelay`, `autoArchiveCustomDays`). Swept on launch, on toggle, on
   setting change, and via a 60s timer.
 - **Global hotkey** ⌥⌘T (Carbon `RegisterEventHotKey`, no Accessibility perm) to
-  toggle the popover. Fixed for now; shown in Options.
+  toggle the popover. Fixed for now; shown in Options. Note: registered by the
+  running process, so it only works while the app is running — see launch-at-login.
+- **Undo delete**: soft delete records `TaskStore.lastDeleted` (task + index);
+  an Undo button appears in the main window (⌘Z) and popover footer to restore it.
+- **Launch at login**: `SMAppService.mainApp` toggle in Options. Makes ⌥⌘T work
+  after a reboot/login without launching the app manually first.
 - **App icon**: generated into `AppIcon.appiconset` (checklist glyph on a blue
-  gradient tile) by `scripts/generate-appicon.swift` — rerun it to restyle.
+  gradient *continuous-corner squircle* with a faint top sheen) by
+  `scripts/generate-appicon.swift` — rerun it to restyle.
+- **Tests**: `ToBarDoTests` unit-tests cover `TaskStore` logic (add/toggle/
+  delete/undo/purge/move/auto-archive/persistence/migration).
 - `tobardo://` URL scheme (`open`/`window`/`add`); verified cold/warm launch.
+  (The URL scheme *does* cold-launch via LaunchServices; the Carbon hotkey does not.)
 - Git repo on `main`, pushed to GitHub remote `origin`
   (`github.com/jibran137/to-bar-do`).
 - License: **MIT + Commons Clause** (free to use/modify/share, no resale).
@@ -120,7 +144,8 @@ where `xcode-select` points at Command Line Tools, prefix builds with
 Roughly ordered, easy → involved. Keep the minimalism bar high.
 
 *Done since v1:* app icon, built-in global hotkey (⌥⌘T), drag-to-reorder,
-archive/history, auto-archive of completed tasks.
+archive/history, auto-archive, undo-delete, launch-at-login, macOS-style icon,
+unit tests.
 
 1. **Configurable hotkey recorder** — let the user rebind ⌥⌘T. Needs a small
    key-capture field (a focused `NSView`/`NSTextField` subclass reading
@@ -128,8 +153,7 @@ archive/history, auto-archive of completed tasks.
    `HotKeyManager`. No third-party dep required.
 2. **Notch fallback** — if the status-item button is hidden, have `tobardo://open`
    fall back to the window or a centered panel. (Offered to owner, not yet done.)
-3. **Launch at login** — `SMAppService.mainApp` (macOS 13+); add to Options.
-4. **Due dates / priorities** — explicitly deferred; add only on demand.
+3. **Due dates / priorities** — explicitly deferred; add only on demand.
 5. **iCloud / cross-Mac sync** — biggest change; would alter the storage layer
    (and now the archive file too).
 6. **Distribution** — GitHub push + Releases; for a download that runs without

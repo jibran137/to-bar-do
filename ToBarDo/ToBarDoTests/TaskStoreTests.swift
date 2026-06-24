@@ -97,6 +97,35 @@ final class TaskStoreTests: XCTestCase {
         XCTAssertTrue(store.archive.isEmpty)
     }
 
+    // MARK: - undo delete
+
+    func testUndoRestoresDeletedTaskToOriginalIndex() {
+        let store = makeStore()
+        store.add(title: "a") // [a]
+        store.add(title: "b") // [b, a]
+        store.add(title: "c") // [c, b, a]
+        store.delete(store.tasks[1]) // remove "b" from the middle
+        XCTAssertEqual(store.tasks.map(\.title), ["c", "a"])
+        store.undoLastDelete()
+        XCTAssertEqual(store.tasks.map(\.title), ["c", "b", "a"], "undo should restore position")
+        XCTAssertNil(store.lastDeleted, "undo clears the pending undo")
+    }
+
+    func testUndoIsNoopWhenNothingDeleted() {
+        let store = makeStore()
+        store.add(title: "a")
+        store.undoLastDelete()
+        XCTAssertEqual(store.tasks.map(\.title), ["a"])
+    }
+
+    func testDeleteSetsLastDeleted() {
+        let store = makeStore()
+        store.add(title: "a")
+        XCTAssertNil(store.lastDeleted)
+        store.delete(store.tasks[0])
+        XCTAssertEqual(store.lastDeleted?.task.title, "a")
+    }
+
     // MARK: - completedCount
 
     func testCompletedCountTracksArchivedDoneItems() {

@@ -65,6 +65,16 @@ struct MainView: View {
                     Label("Archive", systemImage: "archivebox")
                 }
                 .buttonStyle(.plain)
+                if store.lastDeleted != nil {
+                    Button {
+                        store.undoLastDelete()
+                    } label: {
+                        Label("Undo", systemImage: "arrow.uturn.backward")
+                    }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut("z", modifiers: .command)
+                    .help("Undo delete (⌘Z)")
+                }
                 Spacer()
                 if store.completedCount > 0 {
                     Text("\(store.completedCount) completed")

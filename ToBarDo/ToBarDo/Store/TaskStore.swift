@@ -61,6 +61,16 @@ final class TaskStore: ObservableObject {
     /// remain here only.
     @Published private(set) var archive: [TodoTask] = []
 
+    /// The most recent soft delete, kept so it can be undone. Holds the task and
+    /// the position it was removed from; `nil` when there's nothing to undo.
+    @Published private(set) var lastDeleted: DeletedTask?
+
+    /// A soft-deleted task plus where it sat in the active list, for undo.
+    struct DeletedTask: Equatable {
+        let task: TodoTask
+        let index: Int
+    }
+
     /// How long completed tasks linger on the active list before auto-archiving.
     /// Persisted to `UserDefaults`; changing it re-runs the sweep immediately.
     @Published var autoArchiveDelay: AutoArchiveDelay {
@@ -162,7 +172,24 @@ final class TaskStore: ObservableObject {
     /// copy. Used by the menu bar and the main window's active list, so removing
     /// something never erases it from the history.
     func delete(_ task: TodoTask) {
+        if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+            lastDeleted = DeletedTask(task: tasks[index], index: index)
+        }
         tasks.removeAll { $0.id == task.id }
+        save()
+    }
+
+    /// Restores the most recently soft-deleted task to its old position. The
+    /// archive copy was never removed, so undo only has to rebuild the active
+    /// list (re-seeding the archive too, just in case it was cleared meanwhile).
+    func undoLastDelete() {
+        guard let deleted = lastDeleted else { return }
+        let index = min(deleted.index, tasks.count)
+        tasks.insert(deleted.task, at: index)
+        if !archive.contains(where: { $0.id == deleted.task.id }) {
+            archive.insert(deleted.task, at: 0)
+        }
+        lastDeleted = nil
         save()
     }
 
