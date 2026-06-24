@@ -45,15 +45,19 @@ and what's left.
 
 ```
 ToBarDo/ToBarDo/
-├── ToBarDoApp.swift      # @main App; Settings placeholder + AppDelegate adaptor
-├── AppDelegate.swift     # status item, popover, main window, tobardo:// URLs
-├── Info.plist            # LSUIElement + CFBundleURLTypes (tobardo)
-├── Models/Task.swift     # TodoTask (Codable, Identifiable)
-├── Store/TaskStore.swift # JSON load/save; add/toggle/delete
+├── ToBarDoApp.swift          # @main App; Settings placeholder + AppDelegate adaptor
+├── AppDelegate.swift         # status item, popover, main window, tobardo:// URLs, hotkey
+├── HotKeyManager.swift       # Carbon RegisterEventHotKey wrapper (global ⌥⌘T)
+├── Info.plist                # LSUIElement + CFBundleURLTypes (tobardo)
+├── Models/Task.swift         # TodoTask (Codable, Identifiable; isDone, completedAt, url)
+├── Store/TaskStore.swift     # tasks + archive JSON; add/toggle/delete/purge/move/auto-archive
 └── Views/
-    ├── MenuBarView.swift # dropdown UI (takes an openMainWindow closure)
-    ├── MainView.swift    # full window UI
-    └── TaskRow.swift     # shared row: toggle done, hover-to-delete
+    ├── MenuBarView.swift     # dropdown UI (takes an openMainWindow closure)
+    ├── MainView.swift        # full window UI (reorder, Archive + Options buttons)
+    ├── ArchiveView.swift     # archive/history view; permanent delete + clear
+    ├── OptionsView.swift     # options popover: auto-archive delay, hotkey display
+    ├── PopoverKeyMonitor.swift # popover keyboard event monitor
+    └── TaskRow.swift         # shared row: toggle, double-click-to-edit, context menu
 ```
 
 ## Build / run
@@ -63,12 +67,28 @@ ToBarDo/ToBarDo.xcodeproj` then ⌘R, or `xcodebuild ... build`. From a shell
 where `xcode-select` points at Command Line Tools, prefix builds with
 `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
 
-## Status (v1, done)
+## Status (done)
 
-- Quick-add, tap-to-complete, hover-to-delete; empty states.
+- Quick-add, tap-to-complete, hover/menu-to-delete; double-click a row to edit;
+  drag-to-reorder in the main window; empty states.
 - Menu bar dropdown + full window, sharing one `TaskStore`.
-- `tobardo://` URL scheme; verified cold-launch, warm-launch, no crashes.
-- Local git repo initialized (branch `main`); **no GitHub remote yet**.
+- **Archive**: a second JSON file (`archive.json`) keeps every task ever added.
+  Normal delete is *soft* (drops from the active list, kept in the archive);
+  the archive view permanently `purge`s (behind a confirm with "don't ask
+  again") and can `clearArchive` the purely-historical items. Shows a
+  "completed" tally and a "Completed N ago" caption per row.
+- **Auto-archive**: completed tasks linger on the active list for a configurable
+  delay (Never / Immediately / 1h / 1d / 3d / 1w / custom days), then drop to the
+  archive. Driven by `TodoTask.completedAt`; settings persist in `UserDefaults`
+  (`autoArchiveDelay`, `autoArchiveCustomDays`). Swept on launch, on toggle, on
+  setting change, and via a 60s timer.
+- **Global hotkey** ⌥⌘T (Carbon `RegisterEventHotKey`, no Accessibility perm) to
+  toggle the popover. Fixed for now; shown in Options.
+- **App icon**: generated into `AppIcon.appiconset` (checklist glyph on a blue
+  gradient tile) by `scripts/generate-appicon.swift` — rerun it to restyle.
+- `tobardo://` URL scheme (`open`/`window`/`add`); verified cold/warm launch.
+- Git repo on `main`, pushed to GitHub remote `origin`
+  (`github.com/jibran137/to-bar-do`).
 - License: **MIT + Commons Clause** (free to use/modify/share, no resale).
 
 ## Bugs already fixed (don't reintroduce)
@@ -85,31 +105,37 @@ where `xcode-select` points at Command Line Tools, prefix builds with
 ## Known limitations / gotchas
 
 - **Notch**: on notched Macs with a crowded menu bar, macOS can tuck the status
-  icon under the notch, making it hard to click. The Raycast hotkey / URL scheme
+  icon under the notch, making it hard to click. The ⌥⌘T hotkey / URL scheme
   sidesteps this. Apps cannot control their menu bar slot.
-- **No sync**: each Mac has its own `tasks.json`. Tasks do not sync between
-  machines.
-- **No app icon yet** — `AppIcon.appiconset` has slots but no images (blank
-  icon; harmless build warning territory).
+- **No sync**: each Mac has its own `tasks.json` / `archive.json`. No sync
+  between machines.
+- **Hotkey is fixed at ⌥⌘T** — not yet user-configurable (no recorder UI).
+- **`@Published` + `didSet` recursion**: never reassign a `@Published` property
+  inside its own `didSet` (e.g. clamping) — the wrapper makes it a computed
+  accessor, so the assignment re-fires `didSet` and stack-overflows. Clamp at the
+  read site / input bounds instead. (Crashed `customDays`; now fixed.)
 
 ## Roadmap / what we could do next
 
 Roughly ordered, easy → involved. Keep the minimalism bar high.
 
-1. **App icon** — design and drop PNGs into `AppIcon.appiconset`.
+*Done since v1:* app icon, built-in global hotkey (⌥⌘T), drag-to-reorder,
+archive/history, auto-archive of completed tasks.
+
+1. **Configurable hotkey recorder** — let the user rebind ⌥⌘T. Needs a small
+   key-capture field (a focused `NSView`/`NSTextField` subclass reading
+   `keyDown`), persist keyCode+modifiers, re-`register` on the existing
+   `HotKeyManager`. No third-party dep required.
 2. **Notch fallback** — if the status-item button is hidden, have `tobardo://open`
    fall back to the window or a centered panel. (Offered to owner, not yet done.)
-3. **Built-in global hotkey** — so opening the dropdown doesn't depend on Raycast
-   (e.g. `KeyboardShortcuts` package or a Carbon/`NSEvent` global monitor).
-4. **Clear-completed**, **reordering** (drag), **due dates / priorities** — each
-   was explicitly deferred from v1.
-5. **Launch at login** — `SMAppService.mainApp` (macOS 13+).
-6. **Settings UI** — replace the empty `Settings` scene with real preferences.
-7. **iCloud / cross-Mac sync** — biggest change; would alter the storage layer.
-8. **Distribution** — GitHub push + Releases; for a download that runs without
+3. **Launch at login** — `SMAppService.mainApp` (macOS 13+); add to Options.
+4. **Due dates / priorities** — explicitly deferred; add only on demand.
+5. **iCloud / cross-Mac sync** — biggest change; would alter the storage layer
+   (and now the archive file too).
+6. **Distribution** — GitHub push + Releases; for a download that runs without
    Gatekeeper warnings, notarize a signed build (requires Apple Developer
    account, ~$99/yr). Building from source needs none of this.
-9. **Universal binary** — only if Intel Mac support is ever wanted (currently
+7. **Universal binary** — only if Intel Mac support is ever wanted (currently
    arm64-only by choice).
 
 ## Conventions
