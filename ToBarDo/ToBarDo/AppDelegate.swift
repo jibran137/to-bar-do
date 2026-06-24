@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Carbon.HIToolbox
 
 /// Owns the menu bar status item, its popover, and the main window.
 ///
@@ -13,6 +14,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
     private var mainWindow: NSWindow?
+
+    /// Built-in global shortcut (⌥⌘T) to toggle the popover from anywhere, so
+    /// the app doesn't depend on Raycast/Alfred. See `HotKeyManager`.
+    private let hotKey = HotKeyManager()
 
     /// On a cold launch via the URL scheme, macOS can deliver
     /// `application(_:open:)` *before* `applicationDidFinishLaunching`, when the
@@ -38,6 +43,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.target = self
         }
         statusItem = item
+
+        // Global shortcut: ⌥⌘T toggles the popover from any app.
+        hotKey.onPress = { [weak self] in self?.togglePopover(nil) }
+        hotKey.register(keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(cmdKey | optionKey))
 
         didFinishLaunching = true
         let buffered = pendingURLs
