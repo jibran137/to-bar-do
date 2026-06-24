@@ -29,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Popover that hosts the SwiftUI menu bar view.
         popover.behavior = .transient
+        popover.delegate = self
         popover.contentSize = NSSize(width: 300, height: 400)
         popover.contentViewController = NSHostingController(
             rootView: MenuBarView(openMainWindow: { [weak self] in self?.showMainWindow() })
@@ -117,6 +118,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .first { $0.name == "title" || $0.name == "text" }?.value ?? ""
         store.add(title: title) // store.add trims and ignores empty input
     }
+}
+
+// MARK: - Popover lifecycle
+
+extension AppDelegate: NSPopoverDelegate {
+    /// The popover reuses one persistent SwiftUI tree, so per-row edit/selection
+    /// state would otherwise survive a close. Broadcast a reset before each show
+    /// so the dropdown opens clean (no stuck inline-edit cursor, no stale highlight).
+    func popoverWillShow(_ notification: Notification) {
+        NotificationCenter.default.post(name: .toBarDoPopoverWillShow, object: nil)
+    }
+}
+
+extension Notification.Name {
+    /// Posted just before the menu bar popover is shown.
+    static let toBarDoPopoverWillShow = Notification.Name("ToBarDoPopoverWillShow")
 }
 
 /// Main window that closes on the Esc key. AppKit routes Esc to

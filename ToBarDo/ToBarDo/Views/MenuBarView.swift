@@ -16,8 +16,13 @@ struct MenuBarView: View {
     @State private var newTitle = ""
     /// The keyboard-highlighted task, tracked by id so it survives reordering.
     @State private var selectedID: TodoTask.ID?
-    /// Routes popover key events to `handleKey` without relying on first responder.
+    /// Routes popover key/mouse events to handlers without relying on first responder.
     @StateObject private var keys = PopoverKeyMonitor()
+    /// Each row's frame in `.global` space, so a mouse-down can be mapped to a task.
+    @State private var rowFrames: [TodoTask.ID: CGRect] = [:]
+    /// Bumped each time the popover (re)opens; rows watch it to end any inline
+    /// edit left open from a previous session, so the dropdown opens clean.
+    @State private var editResetID = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -52,25 +57,37 @@ struct MenuBarView: View {
                                 isSelected: task.id == selectedID,
                                 titleLineLimit: 3,
                                 onSelect: { selectedID = task.id },
-                                isSelectable: true
+                                editResetID: editResetID
                             )
+                            .background(GeometryReader { geo in
+                                Color.clear.preference(
+                                    key: RowFrameKey.self,
+                                    value: [task.id: geo.frame(in: .global)]
+                                )
+                            })
                             Divider()
                         }
                     }
                 }
                 .frame(maxHeight: 280)
+                .onPreferenceChange(RowFrameKey.self) { rowFrames = $0 }
             }
 
             Divider()
 
             // Footer
-            HStack {
-                Button("Open To-Bar-Do") {
+            HStack(spacing: 14) {
+                Button {
                     openMainWindow()
+                } label: {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
                 }
+                .help("Open To-Bar-Do")
                 if store.lastDeleted != nil {
-                    Button("Undo") { store.undoLastDelete() }
-                        .help("Restore the last deleted task")
+                    Button { store.undoLastDelete() } label: {
+                        Image(systemName: "arrow.uturn.backward")
+                    }
+                    .help("Restore the last deleted task")
                 }
                 Spacer()
                 Button("Quit") {
@@ -85,9 +102,23 @@ struct MenuBarView: View {
         // Resolve the popover window so the key monitor only reacts to it.
         .background(WindowReader { keys.window = $0 }.frame(width: 0, height: 0))
         .onAppear {
-            if selectedID == nil { selectedID = store.tasks.first?.id }
             keys.handler = handleKey
+            keys.mouseDownHandler = selectRow(at:)
             keys.start()
+        }
+        // Each time the popover opens, start clean: no stale highlight, and tell
+        // rows to close any inline edit left over from the previous session.
+        .onReceive(NotificationCenter.default.publisher(for: .toBarDoPopoverWillShow)) { _ in
+            selectedID = nil
+            editResetID += 1
+        }
+    }
+
+    /// Moves the keyboard highlight to whichever row was clicked. Called from the
+    /// AppKit mouse-down monitor, so it fires the instant the mouse goes down.
+    private func selectRow(at point: CGPoint) {
+        if let id = rowFrames.first(where: { $0.value.contains(point) })?.key {
+            selectedID = id
         }
     }
 
@@ -122,8 +153,10 @@ struct MenuBarView: View {
 
         switch event.keyCode {
         case 126:                       // ↑ — always navigates
+            if editing { endEditing() }  // moving the highlight commits & closes the edit
             move(-1); return true
         case 125:                       // ↓ — always navigates
+            if editing { endEditing() }
             move(1); return true
         case 36, 76:                    // Return / keypad Enter
             // While typing a new task, let the quick-add field submit instead.
@@ -144,6 +177,12 @@ struct MenuBarView: View {
         }
     }
 
+    /// Ends any in-progress inline edit by resigning the field editor; SwiftUI
+    /// then sees focus leave the field and commits it (cursor goes away).
+    private func endEditing() {
+        keys.window?.makeFirstResponder(nil)
+    }
+
     private func move(_ delta: Int) {
         guard let id = selectedID,
               let idx = store.tasks.firstIndex(where: { $0.id == id }) else {
@@ -162,5 +201,13 @@ struct MenuBarView: View {
         selectedID = store.tasks.isEmpty
             ? nil
             : store.tasks[min(idx, store.tasks.count - 1)].id
+    }
+}
+
+/// Collects each row's `.global` frame, keyed by task id, for mouse hit-testing.
+private struct RowFrameKey: PreferenceKey {
+    static let defaultValue: [TodoTask.ID: CGRect] = [:]
+    static func reduce(value: inout [TodoTask.ID: CGRect], nextValue: () -> [TodoTask.ID: CGRect]) {
+        value.merge(nextValue()) { _, new in new }
     }
 }

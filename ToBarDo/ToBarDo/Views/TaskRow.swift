@@ -15,16 +15,15 @@ struct TaskRow: View {
     /// Called when the row is clicked, so the popover can move its keyboard
     /// highlight to the clicked task. No-op in the main window.
     var onSelect: () -> Void = {}
-    /// Whether a single tap selects this row. Only the popover wants this; the
-    /// main window leaves it off so the tap gesture doesn't swallow List's
-    /// drag-to-reorder.
-    var isSelectable: Bool = false
     /// Overrides the destructive "Delete" action. Defaults to a soft delete
     /// (removes from the active list, keeps the archive copy). The archive view
     /// passes a permanent-delete handler that confirms first.
     var onDelete: ((TodoTask) -> Void)? = nil
     /// Shows a "Completed …" caption under the title (used by the archive).
     var showsCompletion: Bool = false
+    /// Changes whenever the host (the popover) wants any open inline edit closed,
+    /// e.g. on reopen. The main window leaves this at its default and never resets.
+    var editResetID: Int = 0
 
     @State private var editingField: EditField?
     @State private var draft = ""
@@ -49,6 +48,11 @@ struct TaskRow: View {
                     .focused($editFocused)
                     .onSubmit(commitEdit)
                     .onExitCommand(perform: cancelEdit)
+                    // Losing focus (clicking elsewhere, or the popover closing)
+                    // commits the edit rather than leaving the field stuck open.
+                    .onChange(of: editFocused) { _, focused in
+                        if !focused && editingField != nil { commitEdit() }
+                    }
             } else {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(task.title)
@@ -82,13 +86,16 @@ struct TaskRow: View {
         .background(isSelected ? Color.accentColor.opacity(0.18) : Color.clear)
         .contentShape(Rectangle())
         // Double-click anywhere on the row to edit its title inline.
+        // Single-click selection is handled in AppKit (PopoverKeyMonitor's
+        // mouse-down monitor) so it lands instantly, without tap-gesture lag.
         .onTapGesture(count: 2) {
             if editingField == nil { startEdit(.title) }
         }
-        // Fires alongside the row's buttons without the recognition lag of a
-        // plain .onTapGesture, so selection lands as soon as you click. Popover
-        // only — in the main window it would intercept List's reorder drag.
-        .simultaneousGesture(TapGesture().onEnded { onSelect() }, including: isSelectable ? .all : .subviews)
+        // Host asked for a reset (popover reopened): commit any open edit so a
+        // stale cursor doesn't linger when the dropdown comes back.
+        .onChange(of: editResetID) { _, _ in
+            if editingField != nil { commitEdit() }
+        }
         .contextMenu {
             Button("Edit title…") { startEdit(.title) }
             if task.url == nil {
