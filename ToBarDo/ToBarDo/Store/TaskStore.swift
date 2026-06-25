@@ -106,6 +106,10 @@ final class TaskStore: ObservableObject {
 
     private let fileURL: URL
     private let archiveURL: URL
+    /// Serial queue for disk writes, so saving never blocks the UI. Mutations
+    /// update the in-memory lists on the main thread (UI reacts instantly) and
+    /// hand the snapshot here to be encoded and written; ordering is preserved.
+    private let ioQueue = DispatchQueue(label: "com.tobardo.taskstore.io", qos: .utility)
     /// Periodically re-checks whether any completed task is now due for
     /// archiving, so it happens even while the app sits idle.
     private var sweepTimer: Timer?
@@ -278,10 +282,22 @@ final class TaskStore: ObservableObject {
         write(archive, to: archiveURL)
     }
 
+    /// Blocks until every queued disk write has finished. Not needed in normal
+    /// use (writes are fire-and-forget); tests call it before opening a second
+    /// store over the same directory to assert what was persisted.
+    func flushPendingWrites() {
+        ioQueue.sync {}
+    }
+
     private func write(_ list: [TodoTask], to url: URL) {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted]
-        guard let data = try? encoder.encode(list) else { return }
-        try? data.write(to: url, options: [.atomic])
+        // `list` is a value type, so this snapshot is safe to hand to the
+        // background queue. Encoding + the atomic write happen off the main
+        // thread, so a large archive never makes the UI feel laggy.
+        ioQueue.async {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted]
+            guard let data = try? encoder.encode(list) else { return }
+            try? data.write(to: url, options: [.atomic])
+        }
     }
 }

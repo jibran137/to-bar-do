@@ -219,6 +219,7 @@ final class TaskStoreTests: XCTestCase {
     func testTasksPersistAcrossStoreInstances() {
         let first = makeStore()
         first.add(title: "persist me")
+        first.flushPendingWrites()   // writes are async; wait for disk
         // A second store over the same dir should load what the first wrote.
         let second = TaskStore(directory: dir, defaults: defaults)
         XCTAssertEqual(second.tasks.map(\.title), ["persist me"])
