@@ -38,13 +38,29 @@ The app runs as a menu bar item (no Dock icon). Look for the **checklist** icon 
 
 > **First time using Xcode on this machine?** Run `sudo xcodebuild -runFirstLaunch` once to finish Xcode's component install, otherwise command-line builds may fail to load required plug-ins.
 
+## Usage
+
+The whole app is the dropdown and an optional window — there's nothing to learn.
+
+- **Add** — click the menu bar icon (or press the global shortcut), type a task, hit **Return**.
+- **Complete** — click the circle to the left of a task. Completed tasks get a strikethrough and move to the archive after your chosen delay.
+- **Edit** — double-click a task to rename it inline. Right-click for **Edit title**, **Add/Edit link**, and **Delete**.
+- **Links** — give a task a URL (e.g. a ticket) and a link icon appears; click it to open.
+- **Reorder** — in the window, drag rows, or click the **↕ reorder** button to get explicit up/down handles.
+- **Undo** — deleted the wrong thing? An **Undo** button (⌘Z) appears to bring it back.
+- **Archive & search** — open **Archive** for the full history of everything you've added, with a running "completed" count. Search by title, and permanently delete an item with its trash button (or **Clear** the purely-historical ones).
+- **Options** — the gear button sets the auto-archive delay, **launch at login**, and the **global shortcut** (see below).
+
 ## Global hotkey
 
 Press **⌥⌘T** anywhere to toggle the menu bar dropdown. It's built in (via
 Carbon's `RegisterEventHotKey`), so it needs **no Accessibility permission and
 no third-party launcher** — handy when a crowded menu bar tucks the icon under
-the notch. The shortcut is shown in the app's **Options** popover. It's
-currently fixed at ⌥⌘T.
+the notch.
+
+**Rebind it** in the **Options** popover (the gear button): click the shortcut,
+then press a new combination (it needs at least one modifier). A reset button
+restores ⌥⌘T. Your choice persists across launches.
 
 ## Shortcuts & URL scheme
 
@@ -121,10 +137,10 @@ ToBarDo/ToBarDo/
 
 ## Roadmap
 
-Kept intentionally tiny. Done since v1: app icon, built-in global hotkey,
-drag-to-reorder, archive/history, and auto-archive of completed tasks. Possible
-future additions: a configurable hotkey recorder, launch-at-login, due dates,
-and iCloud sync.
+Kept intentionally tiny. Done since v1: app icon, configurable global hotkey,
+drag-to-reorder, archive/history (with search), auto-archive of completed tasks,
+undo-delete, and launch-at-login. Possible future additions: due dates and
+iCloud sync.
 
 ## License
 
