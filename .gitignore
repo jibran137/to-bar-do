@@ -17,3 +17,6 @@ xcuserdata/
 *.app
 *.dSYM.zip
 *.dSYM
+
+# Screen recordings (source clips for the README GIF; the GIF itself is committed)
+*.mov

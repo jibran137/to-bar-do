@@ -4,6 +4,8 @@ A minimal to-do list that lives in your macOS menu bar — with a proper app win
 
 No accounts, no sync, no clutter. Click the menu bar icon, type a task, hit return. That's the whole learning curve.
 
+![To-Bar-Do demo](docs/demo.gif)
+
 - **Native & lightweight** — pure SwiftUI, no Electron, no dependencies. Idles around ~30–50 MB RAM and ~0% CPU.
 - **Menu bar first** — add, check off, reorder, and delete tasks straight from the dropdown.
 - **Global hotkey** — press **⌥⌘T** to open the dropdown from any app. No Raycast or extra setup required.
