@@ -16,6 +16,17 @@ struct ArchiveView: View {
     /// Persisted preference: when true, permanent deletes skip the confirmation.
     private static let skipConfirmKey = "skipArchiveDeleteConfirm"
 
+    /// Live search text; filters the archive by title (case/diacritic-insensitive).
+    @State private var search = ""
+
+    /// The archive narrowed to the current search, or the whole archive when the
+    /// field is empty.
+    private var filteredArchive: [TodoTask] {
+        let query = search.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return store.archive }
+        return store.archive.filter { $0.title.localizedCaseInsensitiveContains(query) }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header with a back button.
@@ -50,6 +61,30 @@ struct ArchiveView: View {
             .padding(.horizontal)
             .padding(.vertical, 8)
 
+            // Search field (only useful once there's something to search).
+            if !store.archive.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                    TextField("Search archive", text: $search)
+                        .textFieldStyle(.plain)
+                    if !search.isEmpty {
+                        Button {
+                            search = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.tertiary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+            }
+
             if store.archive.isEmpty {
                 Spacer()
                 VStack(spacing: 8) {
@@ -66,9 +101,25 @@ struct ArchiveView: View {
                 }
                 .padding(.horizontal)
                 Spacer()
+            } else if filteredArchive.isEmpty {
+                Spacer()
+                VStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 40))
+                        .foregroundStyle(.secondary)
+                    Text("No matches")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                    Text("No archived task matches “\(search.trimmingCharacters(in: .whitespaces))”.")
+                        .font(.callout)
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.horizontal)
+                Spacer()
             } else {
                 List {
-                    ForEach(store.archive) { task in
+                    ForEach(filteredArchive) { task in
                         TaskRow(task: task, onDelete: confirmDelete, showsCompletion: true, showsDeleteButton: true)
                             .listRowInsets(EdgeInsets())
                     }
