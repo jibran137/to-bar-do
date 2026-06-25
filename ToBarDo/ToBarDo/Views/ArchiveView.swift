@@ -69,7 +69,7 @@ struct ArchiveView: View {
             } else {
                 List {
                     ForEach(store.archive) { task in
-                        TaskRow(task: task, onDelete: confirmDelete, showsCompletion: true)
+                        TaskRow(task: task, onDelete: confirmDelete, showsCompletion: true, showsDeleteButton: true)
                             .listRowInsets(EdgeInsets())
                     }
                 }

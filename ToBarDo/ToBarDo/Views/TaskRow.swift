@@ -21,6 +21,9 @@ struct TaskRow: View {
     var onDelete: ((TodoTask) -> Void)? = nil
     /// Shows a "Completed …" caption under the title (used by the archive).
     var showsCompletion: Bool = false
+    /// Shows an always-visible trash button on the trailing edge (used by the
+    /// archive so a permanent delete is one click, not buried in the menu).
+    var showsDeleteButton: Bool = false
     /// Changes whenever the host (the popover) wants any open inline edit closed,
     /// e.g. on reopen. The main window leaves this at its default and never resets.
     var editResetID: Int = 0
@@ -79,6 +82,17 @@ struct TaskRow: View {
                 }
                 .buttonStyle(.plain)
                 .help(task.url ?? "Open link")
+            }
+
+            if editingField == nil, showsDeleteButton {
+                Button {
+                    (onDelete ?? { store.delete($0) })(task)
+                } label: {
+                    Image(systemName: "trash")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Delete permanently")
             }
         }
         .padding(.horizontal, 10)
