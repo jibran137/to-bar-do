@@ -3,6 +3,7 @@ import SwiftUI
 /// The full window opened from the menu bar.
 struct MainView: View {
     @EnvironmentObject private var store: TaskStore
+    @EnvironmentObject private var hotKeys: HotKeyStore
     @State private var newTitle = ""
     @State private var showingArchive = false
     @State private var showingOptions = false
@@ -112,7 +113,9 @@ struct MainView: View {
                 .buttonStyle(.plain)
                 .help("Options")
                 .popover(isPresented: $showingOptions, arrowEdge: .bottom) {
-                    OptionsView().environmentObject(store)
+                    OptionsView()
+                        .environmentObject(store)
+                        .environmentObject(hotKeys)
                 }
             }
             .padding(.horizontal)

@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Combine
 import Carbon.HIToolbox
 
 /// Owns the menu bar status item, its popover, and the main window.
@@ -15,9 +16,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let popover = NSPopover()
     private var mainWindow: NSWindow?
 
-    /// Built-in global shortcut (⌥⌘T) to toggle the popover from anywhere, so
-    /// the app doesn't depend on Raycast/Alfred. See `HotKeyManager`.
+    /// Built-in global shortcut to toggle the popover from anywhere, so the app
+    /// doesn't depend on Raycast/Alfred. See `HotKeyManager`.
     private let hotKey = HotKeyManager()
+    /// The user's chosen shortcut (default ⌥⌘T). Injected into the window's
+    /// SwiftUI environment so Options can rebind it; we re-register on change.
+    let hotKeyStore = HotKeyStore()
+    private var cancellables = Set<AnyCancellable>()
 
     /// On a cold launch via the URL scheme, macOS can deliver
     /// `application(_:open:)` *before* `applicationDidFinishLaunching`, when the
@@ -45,9 +50,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         statusItem = item
 
-        // Global shortcut: ⌥⌘T toggles the popover from any app.
+        // Global shortcut toggles the popover from any app. Registered from the
+        // user's stored combo, and re-registered whenever they rebind it.
         hotKey.onPress = { [weak self] in self?.togglePopover(nil) }
-        hotKey.register(keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(cmdKey | optionKey))
+        registerHotKey()
+        hotKeyStore.$keyCode.combineLatest(hotKeyStore.$modifiers)
+            .dropFirst()   // skip the initial value we just registered
+            .sink { [weak self] code, mods in
+                self?.hotKey.register(keyCode: code, modifiers: mods)
+            }
+            .store(in: &cancellables)
 
         didFinishLaunching = true
         let buffered = pendingURLs
@@ -74,9 +86,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Main window
 
+    /// Registers the current shortcut from `hotKeyStore`.
+    private func registerHotKey() {
+        hotKey.register(keyCode: hotKeyStore.keyCode, modifiers: hotKeyStore.modifiers)
+    }
+
     func showMainWindow() {
         if mainWindow == nil {
-            let hosting = NSHostingController(rootView: MainView().environmentObject(store))
+            let hosting = NSHostingController(
+                rootView: MainView()
+                    .environmentObject(store)
+                    .environmentObject(hotKeyStore)
+            )
             let window = EscClosableWindow(contentViewController: hosting)
             window.title = "To-Bar-Do"
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]

@@ -65,11 +65,9 @@ struct OptionsView: View {
                 Text("Global shortcut")
                     .font(.callout)
                 Spacer()
-                Text("⌥⌘T")
-                    .font(.callout.monospaced())
-                    .foregroundStyle(.secondary)
+                HotKeyRecorder()
             }
-            Text("Opens To-Bar-Do from any app — no Raycast needed.")
+            Text("Opens To-Bar-Do from any app — no Raycast needed. Click the shortcut, then press a new combination (with at least one modifier).")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

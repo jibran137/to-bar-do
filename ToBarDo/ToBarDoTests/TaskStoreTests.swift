@@ -1,4 +1,5 @@
 import XCTest
+import Carbon.HIToolbox
 @testable import ToBarDo
 
 /// Logic tests for `TaskStore`. Every store is built against a throwaway temp
@@ -223,6 +224,33 @@ final class TaskStoreTests: XCTestCase {
         // A second store over the same dir should load what the first wrote.
         let second = TaskStore(directory: dir, defaults: defaults)
         XCTAssertEqual(second.tasks.map(\.title), ["persist me"])
+    }
+
+    // MARK: - hotkey store
+
+    func testHotKeyStoreDefaultsToOptionCommandT() {
+        let hk = HotKeyStore(defaults: defaults)
+        XCTAssertTrue(hk.isDefault)
+        XCTAssertEqual(hk.displayString, "⌥⌘T")
+    }
+
+    func testHotKeyStorePersistsAndReloads() {
+        let first = HotKeyStore(defaults: defaults)
+        first.update(keyCode: UInt32(kVK_ANSI_K), modifiers: UInt32(cmdKey | shiftKey))
+        XCTAssertFalse(first.isDefault)
+        XCTAssertEqual(first.displayString, "⇧⌘K")
+
+        // A fresh store over the same defaults loads the saved combo.
+        let second = HotKeyStore(defaults: defaults)
+        XCTAssertEqual(second.keyCode, UInt32(kVK_ANSI_K))
+        XCTAssertEqual(second.modifiers, UInt32(cmdKey | shiftKey))
+    }
+
+    func testHotKeyStoreResetRestoresDefault() {
+        let hk = HotKeyStore(defaults: defaults)
+        hk.update(keyCode: UInt32(kVK_Space), modifiers: UInt32(controlKey))
+        hk.reset()
+        XCTAssertTrue(hk.isDefault)
     }
 
     /// A done task saved before `completedAt` existed should get its clock
