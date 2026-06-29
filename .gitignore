@@ -20,3 +20,6 @@ xcuserdata/
 
 # Screen recordings (source clips for the README GIF; the GIF itself is committed)
 *.mov
+
+# Local session handoff notes (personal, not part of the published project)
+HANDOFF.md
